@@ -1,6 +1,9 @@
 import os
 import pandas as pd
 
+from io import StringIO
+
+
 def make_create_table_query(details_df, table_schema, pk_col=None):
     """Run this query
         # SELECT * from information_schema.columns
@@ -18,6 +21,7 @@ def make_create_table_query(details_df, table_schema, pk_col=None):
                 continue
         line = ["   "]
         line.append(row["column_name"])
+        # if data_type is not null
         if row["data_type"] == row["data_type"]:
             if row["data_type"].lower() == "text":
                 line.append(row["data_type"].upper())
@@ -33,6 +37,15 @@ def make_create_table_query(details_df, table_schema, pk_col=None):
                     line.append("BIGINT")
                 else:
                     line.append("INTEGER")
+            elif row["data_type"].lower() == "numeric":
+                append_str = "NUMERIC"
+                if row["numeric_precision_radix"] == row["numeric_precision_radix"]:
+                    append_str = append_str + f"({int(row['numeric_precision_radix'])}"
+                    if row["numeric_scale"] == row["numeric_scale"]:
+                        append_str = append_str + f", {int(row['numeric_scale'])})"
+                    else:
+                        append_str = append_str + ")"
+                line.append(append_str)
             elif row["data_type"].lower() == "date":
                 line.append("DATE")
             else:
@@ -57,3 +70,18 @@ def make_create_table_query(details_df, table_schema, pk_col=None):
     create_query = create_statement + pk_line + columns_and_types + closing
     print(create_query)
     return create_query
+
+
+def bulk_insert_into_db(
+    df, table_name, cur=cur, course_schema=dir_name_for_this_course
+):
+    sio = StringIO()
+    sio.write(df.to_csv(index=None, header=None))
+    sio.seek(0)
+    full_table_name = f"{course_schema}.{table_name}"
+    try:
+        cur.copy_from(
+            file=sio, table=full_table_name, columns=df.columns, sep=",", null=""
+        )
+    except (Exception, pg.DatabaseError) as error:
+        print(f"Error: {error}")
